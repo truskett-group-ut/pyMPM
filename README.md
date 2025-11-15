@@ -1,2 +1,4 @@
-# pyMPM
-A python implementation of the original mutual polarization method Matlab scripts available at https://github.com/zeesherman/mutual-polarization
+**Quickstart**
+
+* To install, download and run `pip install .` from this directory
+* See the examples directory for examples on how to run
