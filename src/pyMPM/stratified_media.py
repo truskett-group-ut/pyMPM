@@ -299,7 +299,9 @@ class Stratified_Media():
         b = b.reshape(2*self.num_interfaces,self.num_waves*self.res)
         b = np.transpose(b,axes=(1,0))
 
-        Es = np.linalg.solve(A,b)
+        Es = []
+        for a,B in zip(A,b):
+            Es.append(np.linalg.solve(a,B))
         Es = np.transpose(Es,axes=(1,0))
         Es = Es.reshape(2*self.num_interfaces,self.num_waves,self.res)
 
@@ -376,7 +378,9 @@ class Stratified_Media():
         b = b.reshape(2*self.num_interfaces,self.num_waves*self.res)
         b = np.transpose(b,axes=(1,0))
 
-        Es = np.linalg.solve(A,b)
+        Es = []
+        for a,B in zip(A,b):
+            Es.append(np.linalg.solve(a,B))
         Es = np.transpose(Es,axes=(1,0))
         Es = Es.reshape(2*self.num_interfaces,self.num_waves,self.res)
 

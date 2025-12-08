@@ -42,7 +42,7 @@ class MPM():#{{{
 
     def __init__(self,box,eps_p,radius=1,eps_m=1,xi=0.5,tol=1e-3,quiet=False,guess_type="derivative"):# {{{
         self.indent_level = 0
-        self.caps = []
+        self.avg_dips = []
         self.dips = []
         self.quiet = quiet
 
@@ -52,11 +52,12 @@ class MPM():#{{{
         self.errortol = tol
         self.num_particles = None
 
-        self.eps_p = eps_p
+        self.eps_p = np.copy(eps_p)
 
-        self.box = box
+        self.box = np.copy(box)
         self.radius = radius
         self.eps_m = eps_m
+        self.num_frames = 0
         # }}}
     def compute(self,positions):# {{{
         '''
@@ -67,6 +68,7 @@ class MPM():#{{{
                 An array of shape (num_frames,num_particles,3) or (num_particles,3).
 
         '''
+        positions = np.copy(positions)
         if len(positions.shape) == 2:
             positions = positions[None,...]
         if len(positions.shape) != 3 or positions.shape[-1] != 3:
@@ -81,69 +83,86 @@ class MPM():#{{{
 
         elif self.num_particles != positions.shape[1]:
             raise Exception("The number of particles has changed!")
-        positions = positions / self.length_scale
 
         num_frames = positions.shape[0]
+        self.num_frames += num_frames
+        if self.num_frames != 1:
+            self._print("frame")
+            self._increase_indent_level()
+        positions = positions / self.length_scale
         for frame_idx in range(num_frames):
-            if num_frames != 1:
-                self._print(f"frame {frame_idx} of {num_frames}")
+            if self.num_frames != 1:
+                self._print(f"{frame_idx} of {self.num_frames}")
                 self._increase_indent_level()
 
             self.EF.set_dip_pos(positions[frame_idx])
             self.EF.set_points(positions[frame_idx])
 
-            cap,dip = self._capacitance_tensor_spectrum()
+            cap,dip = self._compute_spectrum()
 
-            if num_frames != 1:
+            if self.num_frames != 1:
                 self._decrease_indent_level()
 
-            self.caps.append(cap)
+            self.avg_dips.append(cap)
             self.dips.append(dip)
         # }}}
-    def get_cap_dip(self,):# {{{
+    def get_eff_polarizability(self):# {{{
+        '''
+        Returns the effective polarizability of all particle by averaging all particle dipoles over all frames
+
+        **Returns**
+            *alpha_eff*
+                Average polarizability with shape (num_wavelengths, 3, 3) in units of eps_m*|E_o|*r^3
+        '''
+        coef = 1
+        return coef*np.squeeze(np.average(self.avg_dips,axis = 0))# }}}
+    def get_dipoles(self,):# {{{
         '''
         Returns the average polarizability of all frames considered and the dipoles calulated for all frames
 
         **Returns**
-            *C*
-                Average polarizability with shape (num_wavelengths, 3, 3)
             *p*
-                Dipoles of each particles with shape (num_frames, num_wavelegnths, num_particles, 3, 3).
+                Dipoles of each particles with shape (num_frames, num_wavelegnths, num_particles, 3, 3) in units of eps_m*|E_o|*R^3.
                 Any axis of length one is squeezed out.
         '''
-        #coef = self.length_scale**3*self.eps_scale
         coef = 1
-        return coef*np.squeeze(np.average(self.caps,axis = 0)),coef*np.squeeze(self.dips)
+        return coef*np.squeeze(self.dips)# }}}
+    def get_cap_dip(self,):# {{{
+        '''
+        Deprecated. Use get_dipoles and get_eff_polarizibility instead.
+        '''
+        return self.get_eff_polarizability(),self.get_dipoles()
     # }}}
-
-    def _capacitance_tensor_spectrum(self):# {{{
+    def _compute_spectrum(self):# {{{
         cap = np.zeros([self.num_wavevectors,3,3],dtype = np.complex128)
         dip = np.zeros([self.num_wavevectors,self.num_particles,3,3], dtype = np.complex128)
     
         dip_guess = np.zeros([self.num_particles,3,3]).astype('complex128')
+        self._print(f"Wavenumber:")
+        self._increase_indent_level()
         for wavevec_idx in range(self.num_wavevectors):
-            self._print(f"k {wavevec_idx} of {self.num_wavevectors}")
+            self._print(f"{wavevec_idx} of {self.num_wavevectors}")
 
             self_coef = -3/(4*np.pi*(1-self.eps_p[wavevec_idx][:,None]))
             self.EF.set_self_coef(self_coef)
 
             dip_guess = self._calc_guess(dip_guess,wavevec_idx,dip)
-            new_cap, new_dip = self._compute_capacitance_tensor(dip_guess)
+            new_cap, new_dip = self._compute_tensor(dip_guess)
     
             cap[wavevec_idx,:,:] = new_cap
             dip[wavevec_idx,:,:,:] = new_dip
     
         return cap, dip# }}}
-    def _compute_capacitance_tensor(self,dip_guess):# {{{
+    def _compute_tensor(self,dip_guess):# {{{
         E = np.identity(3)
         cap = np.zeros([3,3],dtype = np.complex128)
         dip = np.zeros([self.num_particles,3,3],dtype = np.complex128)
         for dim in range(3):
-            dip[:,dim,:] = self._calc_dipole(E[dim],dip_guess[:,dim])
+            dip[:,dim,:] = self._compute_dipoles(E[dim],dip_guess[:,dim])
             cap[dim,:] = np.average(dip[:,dim,:],axis = 0)
         return cap,dip
     # }}}
-    def _calc_dipole(self,E,dip_guess):# {{{
+    def _compute_dipoles(self,E,dip_guess):# {{{
         num_particles = self.num_particles
     
         dip_guess = dip_guess.flatten()
@@ -164,7 +183,7 @@ class MPM():#{{{
         maxiter = min([num_particles*3,100])
 
         dip,info = gmres(solve,E_match,x0 = dip_guess,rtol=self.errortol,
-                                restart = restart, maxiter = maxiter)
+                         restart = restart, maxiter = maxiter)
         dip = dip.reshape(num_particles,3)
     
         return dip
@@ -175,10 +194,11 @@ class MPM():#{{{
         if not np.iterable(self.radius):
             self.radius = self.radius*np.ones(num_p)
         self.radius = np.asarray(self.radius)
+        self.radius = np.copy(self.radius)
         if len(self.radius.shape) != 1:
             raise Exception("radius must be passed as a scalar or 1-D array of length num_particles")
         elif len(self.radius) != num_p:
-            raise Exception("The number of particles provided by positions is inconsistent with the radius provided")
+            raise Exception("The number of particles provided by positions is inconsistent with the number of radii provided")
         elif not np.all(self.radius == self.radius[0]):
             return NotImplementedError("Radii of different sizes not yet supported")
 
