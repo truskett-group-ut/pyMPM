@@ -83,6 +83,7 @@ class Near_Field:
     def calculate(self,):# {{{
         '''
         Calculates the electric field intensity at each field points.
+
         **Returns**
             *E*
                 The electric field intensity at each field point.
