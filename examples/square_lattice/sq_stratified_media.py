@@ -33,6 +33,7 @@ omega = omega*1e7
 
 for i in range(num_thetas):
     plt.plot(omega,Rp[i],color=plt.cm.Blues(i/(num_thetas-1)*0.8 + 0.2),label=f"{int(np.round(180/np.pi*thetas[i]))}$^o$")
+plt.xlim(np.flip(plt.xlim()))
 plt.ylabel("Reflectance",fontsize=18)
 plt.xlabel("$\\omega$ (cm$^{-1}$)",fontsize=18)
 plt.legend(title="Angle",fontsize=14,title_fontsize=16,framealpha=0)
@@ -41,6 +42,7 @@ plt.show()
 
 for i in range(num_thetas):
     plt.plot(omega,Tp[i],color=plt.cm.Greens(i/(num_thetas-1)*0.8 + 0.2),label=f"{int(np.round(180/np.pi*thetas[i]))}$^o$")
+plt.xlim(np.flip(plt.xlim()))
 plt.ylabel("Transmittance",fontsize=18)
 plt.xlabel("$\\omega$ (cm$^{-1}$)",fontsize=18)
 plt.legend(title="Angle",fontsize=14,title_fontsize=16,framealpha=0)
@@ -49,6 +51,7 @@ plt.show()
 
 for i in range(num_thetas):
     plt.plot(omega,1-Rp[i]-Tp[i],color=plt.cm.Reds(i/(num_thetas-1)*0.8 + 0.2),label=f"{int(np.round(180/np.pi*thetas[i]))}$^o$")
+plt.xlim(np.flip(plt.xlim()))
 plt.ylabel("Absorbance",fontsize=18)
 plt.xlabel("$\\omega$ (cm$^{-1}$)",fontsize=18)
 plt.legend(title="Angle",fontsize=14,title_fontsize=16,framealpha=0)
