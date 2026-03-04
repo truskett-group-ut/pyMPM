@@ -476,9 +476,10 @@ class Electric_Field():#{{{
                 P2 += (p2s)
         P1 = np.array(P1)
         P2 = np.array(P2)
-        flags = P1 != P2
-        P1 = P1[flags]
-        P2 = P2[flags]
+        if self.calc_inter_dipole:
+            flags = P1 != P2
+            P1 = P1[flags]
+            P2 = P2[flags]
         return P2,P1
         #}}}
 # }}}
