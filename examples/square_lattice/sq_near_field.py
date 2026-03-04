@@ -12,17 +12,17 @@ box = np.load("box.npy",)
 #Choose omega
 dim = 2 #Polarization direction
 alpha_eff = np.load("polarizability.npy")
-omega_idx = np.argmax(np.imag(alpha_eff[:,dim,dim]))
+omega_idx = np.argmax(np.imag(alpha_eff[:,dim,dim])) - 1
 
 #Load dipoles and set incident field
 p = np.load("dipoles.npy")
-p = p[omega_idx,:,dim]
+p = p[omega_idx,:,:,dim]
 E0 = np.zeros(3)
 E0[dim] = 1
 
 #Create field points
 n_pts = 100
-A = np.linspace(0,d,n_pts)
+A = np.linspace(-d/2,1.5*d,n_pts)
 y,x = np.meshgrid(A,A)
 field_points = np.array([x,y,np.zeros_like(x)]).T
 field_points = field_points.reshape(n_pts**2,3)
@@ -42,6 +42,8 @@ import matplotlib.pyplot as plt
 from matplotlib import patches
 fig,ax = plt.subplots(figsize=(5,4))
 plt.pcolormesh(x,y,E)
+plt.xlim(np.min(x),np.max(x))
+plt.ylim(np.min(y),np.max(y))
 plt.yticks([])
 plt.xticks([])
 cb = plt.colorbar()
@@ -50,5 +52,8 @@ for x in [0,d]:
     for y in [0,d]:
         c = patches.Circle((x,y),d_opt/2,color=plt.cm.Grays(0.5))
         ax.add_patch(c)
+
+print(pos.shape,p.shape)
+ax.quiver(*pos[:,:2].T,*p[:,:2].T)
 plt.tight_layout()
 plt.show()
