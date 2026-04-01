@@ -3,7 +3,7 @@ import scipy.special
 
 #class Ebeam_Field:
     #def __init__(self,eps,):
-def Ebeam_Field(pos0,pos,omega,eps,v,a):
+def Ebeam_Field(pos0,pos,omega,eps,v,a,min_frac=0.2):
     #returns E in units of e/a*c*eps
     pos0 = pos0/a
     pos_ = pos/a 
@@ -19,6 +19,7 @@ def Ebeam_Field(pos0,pos,omega,eps,v,a):
     omega_ = a*omega[:,*[None for _ in pos_shape]]
 
     r_ = np.linalg.norm(xy_,axis=-1)[...,None]
+    r_[r_<a*min_frac] = a*min_frac
     rhat = xy_/r_
     v_ = v
     gamma = (1-eps*v_**2)**-0.5
@@ -29,7 +30,17 @@ def Ebeam_Field(pos0,pos,omega,eps,v,a):
     xi = 2*np.pi*omega_*r_/v_/gamma
 
     E[...,2] = (prefactor*1j/gamma*scipy.special.kv(0,xi))[...,0]
-    E[...,:2] = prefactor*scipy.special.kv(1,xi) * rhat
+    E[...,:2] = -prefactor*scipy.special.kv(1,xi) * rhat
+
+    #import matplotlib.pyplot as plt
+    #xip = np.linspace(0,0.5,200)
+    #v = 0.7
+    #gamma = (1-eps*v**2)**-0.5
+    #plt.plot(xip,scipy.special.kv(0,xip))
+    #plt.plot(xip,scipy.special.kv(1,xip))
+    #plt.plot(xip,0.1*xip**-1)
+    #plt.ylim(0,4)
+    #plt.show()
 
     if add_omega_axis:
         return E[0]

@@ -27,7 +27,9 @@ class Near_Field:
         *errortol*
             The error tolerance. Defaults to 0.001.
     '''
-    def __init__(self,box,E0,radius=1,dip=None,dip_pos=None,field_points=None,xi=0.5,errortol=1e-3):# {{{
+    def __init__(self,box,E0,radius=1,dip=None,dip_pos=None,field_points=None,# {{{
+                 method="ewald",retarded=False,omega=None,xi=0.5,errortol=1e-3,
+                 cutoff=20):
         self.dip = dip
         self.dip_pos = dip_pos
         self.E0 = E0
@@ -38,12 +40,18 @@ class Near_Field:
 
         self.box = box
         self.field_calculator = None
+        self.omega = omega
+
+        self.method = method
+        self.retarded = retarded
+        self.cutoff = cutoff
 
         self.field_update = True
         self.dip_pos_update = True
         self.dip_update = True
+        self.omega_update = True
         return# }}}
-    def set_dipoles(self,dip):# {{{
+    def set_dipoles(self,dip,omega=None):# {{{
         '''
         Used to set or change the dipoles.
 
@@ -54,7 +62,10 @@ class Near_Field:
         if dip is None:
             raise Exception("dipoles can't be set to None")
         self.dip = dip
-        self.dip_update = True# }}}
+        self.dip_update = True
+        self.omega = omega
+        self.omega_update = True
+        # }}}
     def set_dipole_positions(self,dip_pos):# {{{
         '''
         Used to set or change the dipole positions.
@@ -80,7 +91,7 @@ class Near_Field:
         self.field_points = field_points
         self.field_update = True
         # }}}
-    def calculate(self,):# {{{
+    def calculate(self,return_intensity=True):# {{{
         '''
         Calculates the electric field intensity at each field points.
 
@@ -93,10 +104,15 @@ class Near_Field:
             number_particles = self.dip.shape[0]
             self._set_dims(number_particles)
             self._nondimensionalize()
-            self.field_calculator = Electric_Field(self.box,self.xi,self.errortol)
+        if self.method == "ewald":
+            self.field_calculator = Electric_Field(self.box,self.xi,self.errortol,method=self.method)
+        elif self.method == "direct":
+            self.field_calculator = Electric_Field(self.box,self.cutoff,method=self.method,retarded=self.retarded)
+
         self._update()
         E = -self.field_calculator.calculate() + self.E0[None,:]
-        E = np.sum(np.abs(E)**2,axis = 1)
+        if return_intensity:
+            E = np.sum(np.abs(E)**2,axis = 1)
         return E
         # }}}
     def _set_dims(self,num_p):# {{{
@@ -129,9 +145,14 @@ class Near_Field:
             if self.dip.shape[0] != self.dip_pos.shape[0]:
                 raise Exception("The first dimension of dipole and dipole position arrays must match")
 
+        if self.omega is not None and self.omega_update:
+            self.omega = 2*np.pi * self.length_scale * self.omega
+            self.field_calculator.set_k(self.omega)
+
         self.field_update = False
         self.dip_pos_update = False
         self.dip_update = False
+        self.omega_update = False
         return# }}}
     def _check_have_data(self,):# {{{
         if self.field_points is None:
@@ -143,4 +164,5 @@ class Near_Field:
     def _nondimensionalize(self,):# {{{
         self.length_scale = self.radius[0]
         self.box = self.box/self.length_scale
+
     # }}}

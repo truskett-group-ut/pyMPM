@@ -1,43 +1,19 @@
 import numpy as np
-import time
 import itertools
 import warnings
 from scipy.special import jv as besselj
 from scipy.special import erfc
 from scipy.interpolate import interp1d
 from scipy.fft import fftn, fftshift, ifftn, ifftshift
-from scipy.sparse.linalg import gmres,LinearOperator
+from ..base_field import Base_Electric_Field
 
-class Electric_Field():#{{{
-    def __init__(self,box,xi,errortol,calc_inter_dipole=False,points = None,dip = None,dip_pos=None):# {{{
-        self.box = box
+class Dipole_Field(Base_Electric_Field):#{{{
+    def __init__(self,box,xi,errortol,eps_p=None,points = None,dip = None,dip_pos=None):# {{{
+        super().__init__(box=box,eps_p=eps_p,points=points,dip=dip,dip_pos=dip_pos)
         self.xi = xi
         self.errortol = errortol
-
-        self.dip = dip
-        self.dip_pos = dip_pos
-
-        self.calc_inter_dipole = calc_inter_dipole
-
-        self.has_new_dip_pos = True
-        self.has_new_points = True
-
         self._precalculations()
         # }}}
-    def set_dipoles(self,dip):# {{{
-        self.dip = dip
-        # }}}
-    def set_dip_pos(self,dip_pos):# {{{
-        self.dip_pos = dip_pos
-        self.has_new_dip_pos = True
-    # }}}
-    def set_self_coef(self,self_coef):# {{{
-        self.self_coef = self_coef
-    # }}}
-    def set_points(self,points):# {{{
-        self.points = points
-        self.has_new_points = True
-    # }}}
     def calculate(self):# {{{
         if self.dip_pos is None:
             raise Exception("Dipole positions must be set before calculating electric fields")
@@ -51,6 +27,9 @@ class Electric_Field():#{{{
         if self.has_new_dip_pos:
             self._spread_precalcs()
             self.has_new_dip_pos = False
+        if self.has_new_eps_p:
+            self._real_self_precalcs()
+            self.has_new_eps_p = False
         return self._electric_field()
     # }}}
     def _electric_field(self):#{{{
@@ -191,7 +170,7 @@ class Electric_Field():#{{{
         # }}}
     def _calc_real_space_table(self):# {{{
     
-        r = np.arange(1,10,.001)
+        r = np.arange(1,self.rc+0.001,.001)
         xi = self.xi
 
         pi = np.pi
@@ -409,77 +388,8 @@ class Electric_Field():#{{{
         # }}}
         return 
     # }}}
-    def _gen_neighbor_list(self,):#{{{
-        box_length = self.box
-        cutoff = self.rc
-        points = self.points
-        dip_pos = self.dip_pos
-
-        if np.any(points < 0) or np.any(dip_pos < 0):
-            points = np.copy(points)
-            points += box_length/2
-
-            dip_pos = np.copy(dip_pos)
-            dip_pos += box_length/2
-        numBoxes = (box_length/cutoff).astype(int)
-
-
-        cutoff = box_length/numBoxes
-        if len(points.shape) == 2:
-            numFrames = 1
-            numPoints = points.shape[0]
-            numDips = dip_pos.shape[0]
-            dims = points.shape[1]
-        elif len(points.shape) == 3:
-            numFrames = points.shape[0]
-            numPoints = points.shape[1]
-            numDips = dip_pos.shape[0]
-            dims = points.shape[2]
-
-        flag = numBoxes <= 3
-        if np.all(flag):
-            point_idx = np.arange(numPoints)
-            dip_idx = np.arange(numDips)
-            p1 = np.repeat(point_idx,numDips)
-            p2 = np.tile(dip_idx,numPoints)
-            flag = p1 != p2
-            return p1[flag],p2[flag]
-        elif np.any(flag):
-            points = points[:,~flag]
-            dip_pos = dip_pos[:,~flag]
-            numBoxes = numBoxes[~flag]
-            cutoff = cutoff[~flag]
-            dims = np.count_nonzero(~flag)
-
-        point_indices = (points/cutoff).astype(int)
-        if not np.iterable(numBoxes):
-            numBoxes = np.array([numBoxes]*dims)
-        boxes = {}
-        count = np.zeros(numBoxes)
-        for i,idx in enumerate(point_indices):
-            index = tuple(idx.tolist())
-            if index not in boxes:
-                boxes[index] = list()
-            boxes[index].append(int(i))
-            count[index] += 1
-        P1,P2 = [],[]
-        offset = np.array([np.arange(-1,2) for i in range(dims)]).T
-
-        dip_pos_indices = (dip_pos/cutoff).astype(int)
-        for p1,idx in enumerate(dip_pos_indices):
-            offsets = (idx+offset)%numBoxes
-            for off in itertools.product(*offsets.T):
-                if count[off] == 0:
-                    continue
-                p2s = boxes[off]
-                P1 += [p1]*len(p2s)
-                P2 += (p2s)
-        P1 = np.array(P1)
-        P2 = np.array(P2)
-        if self.calc_inter_dipole:
-            flags = P1 != P2
-            P1 = P1[flags]
-            P2 = P2[flags]
-        return P2,P1
-        #}}}
+    def _real_self_precalcs(self):# {{{
+        self.self_coef = 3/(4*np.pi*(self.eps_p[:,None]-1))
+        return
+    # }}}
 # }}}
